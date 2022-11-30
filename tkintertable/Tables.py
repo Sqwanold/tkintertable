@@ -52,8 +52,8 @@ class TableCanvas(Canvas):
     """A tkinter class for providing table functionality"""
 
     def __init__(self, parent=None, model=None, data=None, read_only=False,
-                 width=None, height=None, bgcolor='#F7F7FA', fgcolor='black',
-                 rows=10, cols=5, **kwargs):
+                 width=None, height=None, bgcolor="grey70", fgcolor='black', altbgcolor="white",
+                 rows=10, cols=5, headercolor=None, rowcolor=None, **kwargs):
         Canvas.__init__(self, parent, bg=bgcolor,
                          width=width, height=height,
                          relief=GROOVE,
@@ -65,8 +65,7 @@ class TableCanvas(Canvas):
         self.width = width
         self.height = height
         self.set_defaults()
-        self.fgcolor = fgcolor
-        self.bgcolor = bgcolor
+
         self.currentpage = None
         self.navFrame = None
         self.currentrow = 0
@@ -83,6 +82,12 @@ class TableCanvas(Canvas):
         self.filtered = False
 
         self.loadPrefs()
+
+        self.bgcolor = bgcolor
+        self.fgcolor = fgcolor
+        self.headerColor = headercolor
+        self.rowcolor = rowcolor
+        self.altbgcolor = altbgcolor
         #set any options passed in kwargs to overwrite defaults and prefs
         for key in kwargs:
             self.__dict__[key] = kwargs[key]
@@ -112,6 +117,7 @@ class TableCanvas(Canvas):
     def set_defaults(self):
         """Set default settings"""
 
+        self.vertboldspacing=1
         self.cellwidth=150
         self.maxcellwidth=200
         self.rowheight=20
@@ -125,7 +131,7 @@ class TableCanvas(Canvas):
         self.linewidth=1.0
         self.rowheaderwidth=40
         self.showkeynamesinheader=False
-        self.thefont = ('Arial',12)
+        self.thefont = ('Calibri',11)
         self.bgcolor = '#F7F7FA'
         self.fgcolor = 'black'
         self.entrybackgr = 'white'
@@ -159,7 +165,7 @@ class TableCanvas(Canvas):
 
     def do_bindings(self):
         """Bind keys and mouse clicks, this can be overriden"""
-        self.bind("<Button-1>",self.handle_left_click)
+        self.bind("<Button-1>", self.handle_left_click)
         self.bind("<Double-Button-1>",self.handle_double_click)
         self.bind("<Control-Button-1>", self.handle_left_ctrl_click)
         self.bind("<Shift-Button-1>", self.handle_left_shift_click)
@@ -339,6 +345,7 @@ class TableCanvas(Canvas):
             self.delete('currentrect')
             self.delete('gridline','text')
             self.tablerowheader.redraw()
+            self.tablecolheader.redraw()
             return
 
         self.drawGrid(startvisiblerow, endvisiblerow)
@@ -397,7 +404,7 @@ class TableCanvas(Canvas):
         """Optimally adjust col widths to accomodate the longest entry
             in each column - usually only called  on first redraw"""
 
-        #self.cols = self.model.getColumnCount()
+        # self.cols = self.model.getColumnCount()
         try:
             fontsize = self.thefont[1]
         except:
@@ -410,13 +417,15 @@ class TableCanvas(Canvas):
             else:
                 w = self.cellwidth
             maxlen = self.model.getlongestEntry(col)
+            if len(colname) > maxlen:
+                maxlen = len(colname) + 4
             size = maxlen * scale
             if size < w:
                 continue
-            #print col, size, self.cellwidth
             if size >= self.maxcellwidth:
                 size = self.maxcellwidth
-            self.model.columnwidths[colname] = size + float(fontsize)/12*6
+            # print(col, size, self.cellwidth)
+            self.model.columnwidths[colname] = size + float(fontsize)/12*5
         return
 
     def autoResizeColumns(self):
@@ -1523,15 +1532,22 @@ class TableCanvas(Canvas):
         x_pos=x_start
 
         if self.vertlines==1:
+            boldtest=0
             for col in range(cols+1):
+                boldtest+=1
+                boldtest%=self.vertboldspacing
+                if boldtest==0:
+                    width=self.linewidth
+                else:
+                    width=self.linewidth*3
                 x=self.col_positions[col]
                 self.create_line(x,y_start,x,y_start+rows*h, tag='gridline',
-                                     fill=self.grid_color, width=self.linewidth)
+                                     fill=self.grid_color, width=width)
         if self.horizlines==1:
             for row in range(startrow, endrow+1):
                 y_pos=y_start+row*h
                 self.create_line(x_start,y_pos,self.tablewidth,y_pos, tag='gridline',
-                                    fill=self.grid_color, width=self.linewidth)
+                                    fill=self.grid_color, width=width)
         return
 
     def drawRowHeader(self):
@@ -1564,7 +1580,7 @@ class TableCanvas(Canvas):
         bg = self.selectedcolor
         if color == None:
             color = 'gray25'
-        w=3
+        w=1
         x1,y1,x2,y2 = self.getCellCoords(row,col)
         rect = self.create_rectangle(x1+w/2,y1+w/2,x2-w/2,y2-w/2,
                                   fill=bg,
@@ -1640,6 +1656,7 @@ class TableCanvas(Canvas):
             self.drawText(row, col, value, color, align=self.align)
             if e.keysym=='Return':
                 self.delete('entry')
+                self.focus_set()
                 #self.drawRect(row, col)
                 #self.gotonextCell(e)
             return
@@ -2287,7 +2304,7 @@ class ColumnHeader(Canvas):
         and column names from the table model."""
 
     def __init__(self, parent=None, table=None):
-        Canvas.__init__(self, parent, bg='gray25', width=500, height=20)
+        Canvas.__init__(self, parent, bg=table.headerColor, width=500, height=20)
         self.thefont='Arial 14'
         if table != None:
             self.table = table
@@ -2312,6 +2329,7 @@ class ColumnHeader(Canvas):
 
     def redraw(self):
 
+        self.model = self.table.getModel()
         cols = self.model.getColumnCount()
         self.tablewidth=self.table.tablewidth
         self.configure(scrollregion=(0,0, self.table.tablewidth+self.table.x_start, self.height))
@@ -2321,6 +2339,7 @@ class ColumnHeader(Canvas):
         align='w'
         pad=4
         h=self.height
+        col=None
         #x_start=self.table.x_start
 
         if cols == 0:
@@ -2339,19 +2358,18 @@ class ColumnHeader(Canvas):
             if len(collabel)>w/10:
                 collabel = collabel[0:int(w/12)]+'.'
             line = self.create_line(x, 0, x, h, tag=('gridline', 'vertline'),
-                                 fill='white', width=2)
+                                 fill='black', width=2)
 
             self.create_text(x+pad,h/2,
                             text=collabel,
                             anchor=align,
-                            fill='white',
+                            fill='black',
                             font=self.thefont,
                             tag='text')
 
-
         x=self.table.col_positions[col+1]
         self.create_line(x,0, x,h, tag='gridline',
-                        fill='white', width=2)
+                        fill='black', width=2)
 
         return
 
@@ -2573,9 +2591,10 @@ class RowHeader(Canvas):
        selection"""
 
     def __init__(self, parent=None, table=None, width=40):
-        Canvas.__init__(self, parent, bg='gray75', width=width, height=None)
+        Canvas.__init__(self, parent, bg=table.bgcolor, width=width, height=None)
 
         if table != None:
+            self.headercolor = table.rowcolor
             self.table = table
             self.width = width
             self.x_start = 0
@@ -2594,6 +2613,7 @@ class RowHeader(Canvas):
     def redraw(self, align='w', showkeys=False):
         """Redraw row header"""
 
+        self.model = self.table.model
         self.height = self.table.rowheight * self.table.rows+10
         self.configure(scrollregion=(0,0, self.width, self.height))
         self.delete('rowheader','text')
@@ -2612,7 +2632,7 @@ class RowHeader(Canvas):
                 text = row+1
             x1,y1,x2,y2 = self.table.getCellCoords(row,0)
             self.create_rectangle(0,y1,w-1,y2,
-                                      fill='gray75',
+                                      fill=self.headercolor,
                                       outline='white',
                                       width=1,
                                       tag='rowheader')
@@ -2725,7 +2745,7 @@ class RowHeader(Canvas):
         if tag==None:
             tag='rect'
         if color==None:
-            color='#0099CC'
+            color=self.headercolor
         if outline==None:
             outline='gray25'
         if delete == 1:

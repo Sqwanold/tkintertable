@@ -135,7 +135,7 @@ class TableModel(object):
         self.importDict(dictdata)
         return
 
-    def importDict(self, newdata):
+    def importDict(self, newdata, **kwargs):
         """Try to create a table model from a dict of the form
            {{'rec1': {'col1': 3, 'col2': 2}, ..}"""
 
@@ -147,7 +147,8 @@ class TableModel(object):
                 if not f in colnames:
                     colnames.append(f)
         for c in colnames:
-            self.addColumn(c)
+            colType = kwargs.get("colType", None)
+            self.addColumn(c, coltype=colType)
         #add the data
         self.data.update(newdata)
         self.reclist = list(self.data.keys())
